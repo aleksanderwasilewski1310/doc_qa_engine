@@ -20,10 +20,10 @@ The workflow is:
 ```mermaid
 flowchart LR
     Client[Client / Browser / curl] --> API[FastAPI app in api.py]
-    API --> Upload[/upload]
-    API --> Ask[/api/v1/ask]
-    API --> AskForm[/api/v1/ask-form]
-    API --> Health[/health]
+  API --> Upload["/upload"]
+  API --> Ask["/api/v1/ask"]
+  API --> AskForm["/api/v1/ask-form"]
+  API --> Health["/health"]
 
     Upload --> Chunking[app/chunking.py]
     Chunking --> DB[PostgreSQL + pgvector]
