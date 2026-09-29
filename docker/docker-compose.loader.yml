@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  loader-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.loader
+    container_name: doc-qa-loader
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
