@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# secrets
+.env
+
+# Initial Model
+vision-model.tar.gz
+
+# Developer notes
+notes.txt
