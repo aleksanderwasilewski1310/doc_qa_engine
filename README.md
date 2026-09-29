@@ -1,16 +1,21 @@
 # Document QA + Loader API
 
+![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS-S3-569A31?logo=amazons3&logoColor=white)
+![PostgreSQL and pgvector](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)
+
 This project is a FastAPI-based document ingestion and question answering system built around pgvector and AWS Bedrock.
 
 The application now uses a single entry point in `api.py`, where the upload and QA routes are exposed together. The ingestion and retrieval logic is separated into focused modules under `app/`.
 
 ## Overview
 
-The workflow is:
+The upload and question-answering workflow is:
 
-1. A PDF is uploaded through `/upload`
-2. The file is chunked and stored in PostgreSQL
-3. Each chunk is embedded with an AWS Bedrock embedding model
+1. A PDF is sent to `/upload` and saved to the S3 bucket at `uploads/<filename>`
+2. The API writes a temporary local copy and sends it through the chunking pipeline
+3. Each chunk is embedded with an AWS Bedrock embedding model and stored in PostgreSQL with pgvector
 4. A user question is embedded and compared against stored vectors
 5. The best matching chunks are gathered and passed as context to Claude through Bedrock
 6. The final answer is returned to the client
@@ -25,6 +30,7 @@ flowchart LR
   API --> AskForm["/api/v1/ask-form"]
   API --> Health["/health"]
 
+    Upload --> S3["S3: uploads/<filename>"]
     Upload --> Chunking[app/chunking.py]
     Chunking --> DB[PostgreSQL + pgvector]
 
@@ -76,7 +82,7 @@ curl http://localhost:8000/health
 
 ### POST /upload
 
-Uploads a PDF, processes it with the chunking pipeline, and stores chunks in the database.
+Uploads the original PDF to S3 at `s3://enterprise-document-storage-prod-eu-central-1/uploads/<filename>`, then processes a temporary local copy with the chunking pipeline and stores the resulting chunks in PostgreSQL. The response includes the S3 location.
 
 ```bash
 curl -X POST "http://localhost:8000/upload" \
@@ -90,7 +96,8 @@ Example response:
 {
   "status": "success",
   "filename": "sample.pdf",
-  "distance": 10.0
+  "distance": 10.0,
+  "s3_location": "s3://enterprise-document-storage-prod-eu-central-1/uploads/sample.pdf"
 }
 ```
 
@@ -240,6 +247,12 @@ Then open:
 - `http://localhost:8000/health`
 
 ## Environment variables
+
+### S3 document storage
+
+The upload endpoint currently uses the bucket `enterprise-document-storage-prod-eu-central-1` in `eu-central-1`; these values are configured in `api.py`, not read from environment variables. Provision the bucket with the Terraform configuration in `infrastructure/s3.tf` before using uploads. The configured bucket blocks public access, enables KMS server-side encryption, and has versioning enabled.
+
+The AWS identity used by the API must be allowed to write objects under the `uploads/` prefix. For example, grant `s3:PutObject` on `arn:aws:s3:::enterprise-document-storage-prod-eu-central-1/uploads/*`. Configure credentials through the standard AWS SDK credential chain (environment variables, an AWS profile, or the workload's IAM role).
 
 ### PostgreSQL
 
