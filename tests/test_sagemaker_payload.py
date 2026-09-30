@@ -1,4 +1,3 @@
-import os
 import sys
 from pathlib import Path
 
@@ -31,7 +30,10 @@ def test_invoke_sagemaker_vision_uses_raw_image_bytes(monkeypatch):
         captured.update(kwargs)
         return {"Body": FakeBody()}
 
-    monkeypatch.setattr("app.main.sagemaker_runtime", type("Runtime", (), {"invoke_endpoint": fake_invoke_endpoint})())
+    monkeypatch.setattr(
+        "app.main.sagemaker_runtime",
+        type("Runtime", (), {"invoke_endpoint": fake_invoke_endpoint})(),
+    )
 
     result = invoke_sagemaker_vision(b"fake-image")
 

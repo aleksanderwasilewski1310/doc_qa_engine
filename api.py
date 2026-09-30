@@ -49,7 +49,6 @@ async def upload_and_chunk(
 ):
     """Upload PDF, chunk it, and store chunks in the database."""
 
-
     if file.filename is None:
         raise ValueError("No filename provided for upload.")
 

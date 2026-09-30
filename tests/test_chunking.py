@@ -20,14 +20,21 @@ from langchain_core.documents import Document
 class TestChunkPdf(unittest.TestCase):
     def test_chunk_pdf_splits_loaded_documents_and_adds_metadata(self):
         """Chunked documents should keep page content and receive chunk metadata."""
+
         class FakeLoader:
             def __init__(self, path):
                 self.path = path
 
             def load(self):
                 return [
-                    Document(page_content="First paragraph.\n\nSecond paragraph.", metadata={"source": self.path, "page": 1}),
-                    Document(page_content="Third paragraph.", metadata={"source": self.path, "page": 2}),
+                    Document(
+                        page_content="First paragraph.\n\nSecond paragraph.",
+                        metadata={"source": self.path, "page": 1},
+                    ),
+                    Document(
+                        page_content="Third paragraph.",
+                        metadata={"source": self.path, "page": 2},
+                    ),
                 ]
 
         class FakeTextSplitter:
@@ -35,14 +42,19 @@ class TestChunkPdf(unittest.TestCase):
                 self.kwargs = kwargs
 
             def split_documents(self, docs):
-                return [Document(page_content=doc.page_content, metadata=dict(doc.metadata)) for doc in docs]
+                return [
+                    Document(page_content=doc.page_content, metadata=dict(doc.metadata))
+                    for doc in docs
+                ]
 
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
             temp_pdf.write(b"%PDF-1.4\n")
             temp_path = Path(temp_pdf.name)
 
         try:
-            with patch.object(chunking, "PyPDFLoader", FakeLoader), patch.object(chunking, "RecursiveCharacterTextSplitter", FakeTextSplitter):
+            with patch.object(chunking, "PyPDFLoader", FakeLoader), patch.object(
+                chunking, "RecursiveCharacterTextSplitter", FakeTextSplitter
+            ):
                 chunks = chunking.chunk_pdf(temp_path)
 
             self.assertEqual(len(chunks), 2)

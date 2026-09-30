@@ -1,4 +1,3 @@
-import json
 import os
 from typing import Any, List
 
@@ -24,7 +23,9 @@ def build_bedrock_llm():
 def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
     """Query pgvector for the most similar chunks and return them as retrieval candidates."""
     query_vector = embed_texts([question])[0]
-    embedding_literal = "[" + ",".join(str(float(value)) for value in query_vector) + "]"
+    embedding_literal = (
+        "[" + ",".join(str(float(value)) for value in query_vector) + "]"
+    )
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -85,7 +86,9 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
 def _extract_answer_text(response: Any) -> str:
     answer_text = getattr(response, "content", str(response))
     if isinstance(answer_text, list):
-        answer_text = "".join(part.get("text", "") for part in answer_text if isinstance(part, dict))
+        answer_text = "".join(
+            part.get("text", "") for part in answer_text if isinstance(part, dict)
+        )
     return str(answer_text).strip()
 
 
@@ -139,5 +142,7 @@ Question:
         "answer": answer_text,
         "context": combined_context,
         "sources": retrieval.get("sources", []),
-        "source_texts": [source.get("text", "") for source in retrieval.get("sources", [])],
+        "source_texts": [
+            source.get("text", "") for source in retrieval.get("sources", [])
+        ],
     }

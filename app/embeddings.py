@@ -4,6 +4,7 @@ Reads AWS credentials from environment (optionally via .env) and provides
 `embed_texts` to obtain embeddings from Bedrock models like Amazon Titan
 or Cohere Embed.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,8 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_bedrock_client():
-    region = os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION") or "eu-central-1"
-    
+    region = (
+        os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION") or "eu-central-1"
+    )
+
     # Initialize boto3 client
     kwargs = {"region_name": region}
     if os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"):
@@ -36,7 +39,7 @@ def _embed_single_text_titan(text: str, client, model_id: str) -> List[float]:
     payload = {
         "inputText": text,
         "dimensions": 1024,  # Available options: 256, 512, 1024
-        "normalize": True
+        "normalize": True,
     }
 
     response = client.invoke_model(
@@ -50,13 +53,11 @@ def _embed_single_text_titan(text: str, client, model_id: str) -> List[float]:
     return response_body["embedding"]
 
 
-def _embed_cohere_multilingual(texts: List[str], client, model_id: str) -> List[List[float]]:
+def _embed_cohere_multilingual(
+    texts: List[str], client, model_id: str
+) -> List[List[float]]:
     """Cohere v3 supports batching multiple texts natively in a single API call."""
-    payload = {
-        "texts": texts,
-        "input_type": "search_document",
-        "truncate": "END"
-    }
+    payload = {"texts": texts, "input_type": "search_document", "truncate": "END"}
 
     response = client.invoke_model(
         modelId=model_id,
@@ -84,7 +85,9 @@ def embed_texts(texts: List[str], model_id: Optional[str] = None) -> List[List[f
     if not texts:
         return []
 
-    model = model_id or os.getenv("AWS_EMBEDDING_MODEL") or "amazon.titan-embed-text-v2:0"
+    model = (
+        model_id or os.getenv("AWS_EMBEDDING_MODEL") or "amazon.titan-embed-text-v2:0"
+    )
     client = _get_bedrock_client()
 
     # Estimate token usage before making requests. Prefer `tiktoken` when available.
@@ -104,7 +107,12 @@ def embed_texts(texts: List[str], model_id: Optional[str] = None) -> List[List[f
 
     token_counts = [_count_tokens(t) for t in texts]
     total_tokens = sum(token_counts)
-    logger.info("Embedding request: model=%s texts=%d total_tokens=%d", model, len(texts), total_tokens)
+    logger.info(
+        "Embedding request: model=%s texts=%d total_tokens=%d",
+        model,
+        len(texts),
+        total_tokens,
+    )
 
     try:
         # Cohere supports passing the entire batch of texts natively

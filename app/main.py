@@ -13,7 +13,7 @@ load_dotenv()  # Load environment variables from .env file
 
 app = FastAPI(
     title="Enterprise Multimodal Document QA Engine",
-    description="Isolated backend service handling multimodal document processing and LLM synthesis via private AWS infrastructure."
+    description="Isolated backend service handling multimodal document processing and LLM synthesis via private AWS infrastructure.",
 )
 
 # Initialize AWS SDK clients.
@@ -30,7 +30,9 @@ bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
 s3_client = boto3.client("s3", region_name=region)
 
 # Environment variables populated via ECS task definition
-SAGEMAKER_VISION_ENDPOINT = os.getenv("SAGEMAKER_VISION_ENDPOINT", "vision-ocr-endpoint")
+SAGEMAKER_VISION_ENDPOINT = os.getenv(
+    "SAGEMAKER_VISION_ENDPOINT", "vision-ocr-endpoint"
+)
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "enterprise-document-storage-dev")
 
 
@@ -40,9 +42,7 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
     The deployed Hugging Face container expects a JSON payload containing a base64-encoded image.
     """
     try:
-        payload = {
-            "inputs": base64.b64encode(image_bytes).decode("utf-8")
-        }
+        payload = {"inputs": base64.b64encode(image_bytes).decode("utf-8")}
 
         response = sagemaker_runtime.invoke_endpoint(
             EndpointName=SAGEMAKER_VISION_ENDPOINT,
@@ -54,12 +54,16 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
         result = json.loads(raw_response)
 
         if isinstance(result, dict):
-            return result.get("extracted_text", result.get("generated_text", str(result)))
+            return result.get(
+                "extracted_text", result.get("generated_text", str(result))
+            )
 
         if isinstance(result, list) and result:
             first_item = result[0]
             if isinstance(first_item, dict):
-                return first_item.get("extracted_text", first_item.get("generated_text", str(first_item)))
+                return first_item.get(
+                    "extracted_text", first_item.get("generated_text", str(first_item))
+                )
             return str(first_item)
 
         return str(result)
@@ -74,12 +78,12 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
 def generate_llm_response(prompt: str, context: str) -> str:
     """
     Executes a contextual generation call against AWS Bedrock (Claude 3.5 Sonnet).
-    
+
     Architectural Note:
     Uses strict system prompts to constrain LLM scope to the extracted context (mitigating hallucination risks).
     """
-    formatted_prompt = f"""System: You are an enterprise technical documentation assistant. 
-Answer EXCLUSIVELY using the context provided below from the ingested document/image. 
+    formatted_prompt = f"""System: You are an enterprise technical documentation assistant.
+Answer EXCLUSIVELY using the context provided below from the ingested document/image.
 If the information is not present in the context, explicitly state that you cannot answer based on the provided data.
 
 Document Context:
@@ -91,10 +95,8 @@ Response:"""
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 1000,
-        "messages": [
-            {"role": "user", "content": formatted_prompt}
-        ],
-        "temperature": 0.1  # Low temperature to prioritize deterministic extraction over creativity
+        "messages": [{"role": "user", "content": formatted_prompt}],
+        "temperature": 0.1,  # Low temperature to prioritize deterministic extraction over creativity
     }
 
     try:
@@ -102,18 +104,19 @@ Response:"""
             modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
             contentType="application/json",
             accept="application/json",
-            body=json.dumps(payload)
+            body=json.dumps(payload),
         )
         response_body = json.loads(response.get("body").read())
         return response_body["content"][0]["text"]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Bedrock Runtime Execution Error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Bedrock Runtime Execution Error: {str(e)}"
+        )
 
 
 @app.post("/api/v1/query-document")
 async def process_document_query(
-    question: str = Form(...),
-    file: UploadFile = File(...)
+    question: str = Form(...), file: UploadFile = File(...)
 ):
     """
     Ingest payload endpoint:
@@ -123,14 +126,14 @@ async def process_document_query(
     4. Passes extracted text to Bedrock LLM via RAG synthesis loop.
     """
     file_bytes = await file.read()
-    
+
     # Secure object storage write using Server-Side Encryption (SSE-KMS)
     s3_key = f"uploads/{file.filename}"
     s3_client.put_object(
         Bucket=S3_BUCKET_NAME,
         Key=s3_key,
         Body=file_bytes,
-        ServerSideEncryption="aws:kms"
+        ServerSideEncryption="aws:kms",
     )
 
     # Step 1: Extract structural text & tables via dedicated SageMaker OCR endpoint
@@ -143,9 +146,8 @@ async def process_document_query(
         "status": "success",
         "s3_location": f"s3://{S3_BUCKET_NAME}/{s3_key}",
         "extracted_context_length": len(extracted_text),
-        "answer": answer
+        "answer": answer,
     }
-
 
 
 @app.post("/api/v1/upload-and-chunk")

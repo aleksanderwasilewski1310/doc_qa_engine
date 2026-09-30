@@ -19,7 +19,7 @@ CREATE TABLE document_chunks (
 );
 
 -- STEP 4: HNSW index to speed up semantic search (Cosine Distance)
-CREATE INDEX idx_document_chunks_embedding 
+CREATE INDEX idx_document_chunks_embedding
 ON document_chunks USING hnsw (embedding vector_cosine_ops);
 
 -- STEP 5: Additional table for generic document chunks

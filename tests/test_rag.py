@@ -12,14 +12,18 @@ class FakeLLM:
     def invoke(self, prompt):
         self.calls.append(prompt)
         if len(self.calls) == 1:
-            return SimpleNamespace(content="I cannot determine the answer from the provided context.")
+            return SimpleNamespace(
+                content="I cannot determine the answer from the provided context."
+            )
         return SimpleNamespace(content="The answer is in the second chunk.")
 
 
 class TestRagFallback(unittest.TestCase):
     @patch("app.rag.build_bedrock_llm")
     @patch("app.rag.retrieve_relevant_chunks")
-    def test_answer_question_goes_to_next_chunk_when_first_is_not_relevant(self, mock_retrieve, mock_llm_factory):
+    def test_answer_question_goes_to_next_chunk_when_first_is_not_relevant(
+        self, mock_retrieve, mock_llm_factory
+    ):
         mock_llm = FakeLLM()
         mock_llm_factory.return_value = mock_llm
         mock_retrieve.return_value = {
@@ -29,8 +33,16 @@ class TestRagFallback(unittest.TestCase):
                 {"document_name": "doc1.pdf", "similarity": 0.85},
             ],
             "chunks": [
-                {"document_name": "doc1.pdf", "chunk_text": "first chunk", "similarity": 0.90},
-                {"document_name": "doc1.pdf", "chunk_text": "second chunk", "similarity": 0.85},
+                {
+                    "document_name": "doc1.pdf",
+                    "chunk_text": "first chunk",
+                    "similarity": 0.90,
+                },
+                {
+                    "document_name": "doc1.pdf",
+                    "chunk_text": "second chunk",
+                    "similarity": 0.85,
+                },
             ],
         }
 
