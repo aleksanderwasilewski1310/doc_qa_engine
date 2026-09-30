@@ -3,6 +3,7 @@ import psycopg
 from datetime import datetime
 from typing import List, Optional
 
+
 def _get_db_config():
     return {
         "host": os.getenv("POSTGRES_HOST", "localhost"),
@@ -35,7 +36,7 @@ def insert_chunk(
         with conn.cursor() as cur:
             if embedding is not None:
                 # Convert embedding list to Postgres vector literal string and cast to vector
-                emb_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+                emb_str = "[" + ",".join(str(float(x)) for x in embedding) + "]"
                 cur.execute(
                     "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance, embedding) VALUES (%s, %s, %s, %s, %s::vector) RETURNING id",
                     (document_name, ts, chunk_text, distance, emb_str),
@@ -54,10 +55,10 @@ def insert_chunk(
 
 def insert_chunks(chunks: List[dict]) -> None:
     """Insert multiple chunks. Each chunk is a dict with keys:
-       - document_name (str)
-       - chunk_text (str)
-       - distance (optional float)
-       - timestamp (optional datetime)
+    - document_name (str)
+    - chunk_text (str)
+    - distance (optional float)
+    - timestamp (optional datetime)
     """
     if not chunks:
         return
@@ -69,10 +70,16 @@ def insert_chunks(chunks: List[dict]) -> None:
                 ts = c.get("timestamp") or datetime.utcnow()
                 embedding = c.get("embedding")
                 if embedding is not None:
-                    emb_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+                    emb_str = "[" + ",".join(str(float(x)) for x in embedding) + "]"
                     cur.execute(
                         "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance, embedding) VALUES (%s,%s,%s,%s,%s::vector)",
-                        (c["document_name"], ts, c["chunk_text"], c.get("distance"), emb_str),
+                        (
+                            c["document_name"],
+                            ts,
+                            c["chunk_text"],
+                            c.get("distance"),
+                            emb_str,
+                        ),
                     )
                 else:
                     cur.execute(

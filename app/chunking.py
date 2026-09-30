@@ -7,6 +7,8 @@ character text splitter.
 
 from pathlib import Path
 from typing import Any, Dict, List
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import logging
 import warnings
 
@@ -22,6 +24,7 @@ except Exception:
         def insert_chunks(records: List[Dict[str, Any]]) -> None:
             pass
 
+
 # Suppress noisy DeprecationWarnings from langchain_community which may be
 # promoted to errors in some environments.
 warnings.filterwarnings(
@@ -35,10 +38,9 @@ except Exception:
     try:
         from langchain_community import PyPDFLoader
     except Exception:
-        raise ImportError("PyPDFLoader could not be imported. Please install langchain-community and pypdf.")
-
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+        raise ImportError(
+            "PyPDFLoader could not be imported. Please install langchain-community and pypdf."
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -98,13 +100,13 @@ def chunk_pdf(
         length_function=len,
         is_separator_regex=True,  # Enable regex!
         separators=[
-            r"\n(?=[I|V|X]+\.\s)",  # Splits before Roman numeral headers, e.g., \nII. 
-            r"\n(?=§\s*\d+)",       # Splits before section symbols, e.g., \n§ 1
-            "\n\n", 
-            "\n", 
-            "\. ", 
-            " ", 
-            ""
+            r"\n(?=[I|V|X]+\.\s)",  # Splits before Roman numeral headers, e.g., \nII.
+            r"\n(?=§\s*\d+)",  # Splits before section symbols, e.g., \n§ 1
+            "\n\n",
+            "\n",
+            "\. ",
+            " ",
+            "",
         ],
     )
 
@@ -169,7 +171,11 @@ def main(pdf_path: str, race_distance: float) -> None:
                         for r, v in zip(records, vectors):
                             r["embedding"] = v
                     else:
-                        logger.warning("Embedding count mismatch: %d texts -> %d vectors", len(records), len(vectors) if vectors else 0)
+                        logger.warning(
+                            "Embedding count mismatch: %d texts -> %d vectors",
+                            len(records),
+                            len(vectors) if vectors else 0,
+                        )
                 except Exception as emb_err:
                     logger.warning("Failed to compute embeddings: %s", emb_err)
 

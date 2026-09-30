@@ -7,6 +7,7 @@ def _load_ragas():
     try:
         from ragas import evaluate
         from ragas.metrics import answer_relevancy, context_precision, faithfulness
+
         return evaluate, answer_relevancy, context_precision, faithfulness
     except ModuleNotFoundError as exc:
         raise RuntimeError(
@@ -16,7 +17,9 @@ def _load_ragas():
         ) from exc
 
 
-def evaluate_rag(question: str, answer: str, contexts: List[str], ground_truth: str | None = None) -> Dict[str, Any]:
+def evaluate_rag(
+    question: str, answer: str, contexts: List[str], ground_truth: str | None = None
+) -> Dict[str, Any]:
     """Evaluate a single RAG answer with Ragas metrics when possible."""
     if not question or not answer:
         return {
@@ -36,12 +39,14 @@ def evaluate_rag(question: str, answer: str, contexts: List[str], ground_truth: 
     if ground_truth:
         metrics.append(answer_relevancy)
 
-    data = [{
-        "user_input": question,
-        "response": answer,
-        "retrieved_contexts": contexts,
-        "reference": ground_truth,
-    }]
+    data = [
+        {
+            "user_input": question,
+            "response": answer,
+            "retrieved_contexts": contexts,
+            "reference": ground_truth,
+        }
+    ]
 
     result = evaluate(data, metrics=metrics)
     scores = {}
