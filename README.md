@@ -171,6 +171,21 @@ erDiagram
     }
 ```
 
+  ### DynamoDB chat history
+
+  Terraform defines the `doc_qa_chat_history` table in `infrastructure/dynamodb.tf` for chat-session messages. The table uses `session_id` as its partition key and `message_id` as its sort key, allowing multiple messages per session. It uses on-demand billing (`PAY_PER_REQUEST`) and enables TTL on the `ttl` attribute; write `ttl` as a Unix timestamp in seconds when a message should expire. The Terraform provider is configured for `eu-central-1`, and the table is tagged with the `poc` environment and `doc_qa_engine` project.
+
+  To review and apply the Terraform configuration:
+
+  ```bash
+  cd infrastructure
+  terraform init
+  terraform plan
+  terraform apply
+  ```
+
+  Review the plan before applying: Terraform operates on all resources configured in the `infrastructure/` directory, not only the DynamoDB table. This table is provisioned independently; the current document retrieval workflow continues to store chunks in PostgreSQL with pgvector.
+
 ## Storage and query behavior
 
 The active retrieval table is `doc_chunks`.
