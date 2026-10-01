@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 
 def _load_ragas():
@@ -18,8 +18,8 @@ def _load_ragas():
 
 
 def evaluate_rag(
-    question: str, answer: str, contexts: List[str], ground_truth: str | None = None
-) -> Dict[str, Any]:
+    question: str, answer: str, contexts: list[str], ground_truth: str | None = None
+) -> dict[str, Any]:
     """Evaluate a single RAG answer with Ragas metrics when possible."""
     if not question or not answer:
         return {

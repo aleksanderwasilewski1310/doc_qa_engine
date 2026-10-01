@@ -1,13 +1,13 @@
 import os
+from datetime import UTC, datetime
+
 import psycopg
-from datetime import datetime
-from typing import List, Optional
 
 
 def _get_db_config():
     return {
         "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", 5433)),
+        "port": int(os.getenv("POSTGRES_PORT", "5433")),
         "user": os.getenv("POSTGRES_USER", "postgres"),
         "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
         "dbname": os.getenv("POSTGRES_DB", "postgres"),
@@ -22,15 +22,15 @@ def get_connection():
 def insert_chunk(
     document_name: str,
     chunk_text: str,
-    distance: Optional[float] = None,
-    timestamp: Optional[datetime] = None,
-    embedding: Optional[List[float]] = None,
+    distance: float | None = None,
+    timestamp: datetime | None = None,
+    embedding: list[float] | None = None,
 ) -> int:
     """Insert a single chunk into the `doc_chunks` table.
 
     Returns the inserted row id.
     """
-    ts = timestamp if timestamp is not None else datetime.utcnow()
+    ts = timestamp if timestamp is not None else datetime.now(UTC)
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -53,7 +53,7 @@ def insert_chunk(
         conn.close()
 
 
-def insert_chunks(chunks: List[dict]) -> None:
+def insert_chunks(chunks: list[dict]) -> None:
     """Insert multiple chunks. Each chunk is a dict with keys:
     - document_name (str)
     - chunk_text (str)
@@ -67,7 +67,7 @@ def insert_chunks(chunks: List[dict]) -> None:
     try:
         with conn.cursor() as cur:
             for c in chunks:
-                ts = c.get("timestamp") or datetime.utcnow()
+                ts = c.get("timestamp") or datetime.now(UTC)
                 embedding = c.get("embedding")
                 if embedding is not None:
                     emb_str = "[" + ",".join(str(float(x)) for x in embedding) + "]"

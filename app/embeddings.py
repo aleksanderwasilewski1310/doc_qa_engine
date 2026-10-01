@@ -10,11 +10,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tiktoken
-from typing import List, Optional
 
-from dotenv import load_dotenv
 import boto3
+import tiktoken
+from botocore.exceptions import BotoCoreError
+from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def _get_bedrock_client():
     return boto3.client("bedrock-runtime", **kwargs)
 
 
-def _embed_single_text_titan(text: str, client, model_id: str) -> List[float]:
+def _embed_single_text_titan(text: str, client, model_id: str) -> list[float]:
     """Generates embedding for a single string using Amazon Titan Embeddings V2."""
     payload = {
         "inputText": text,
@@ -54,8 +54,8 @@ def _embed_single_text_titan(text: str, client, model_id: str) -> List[float]:
 
 
 def _embed_cohere_multilingual(
-    texts: List[str], client, model_id: str
-) -> List[List[float]]:
+    texts: list[str], client, model_id: str
+) -> list[list[float]]:
     """Cohere v3 supports batching multiple texts natively in a single API call."""
     payload = {"texts": texts, "input_type": "search_document", "truncate": "END"}
 
@@ -70,7 +70,7 @@ def _embed_cohere_multilingual(
     return response_body["embeddings"]
 
 
-def embed_texts(texts: List[str], model_id: Optional[str] = None) -> List[List[float]]:
+def embed_texts(texts: list[str], model_id: str | None = None) -> list[list[float]]:
     """Return embeddings for the provided list of texts using AWS Bedrock.
 
     Args:
@@ -97,11 +97,14 @@ def embed_texts(texts: List[str], model_id: Optional[str] = None) -> List[List[f
                 # Attempt to choose encoding for the model; fall back to cl100k_base
                 try:
                     enc = tiktoken.encoding_for_model(model)
-                except Exception:
+                except KeyError:
                     enc = tiktoken.get_encoding("cl100k_base")
                 return len(enc.encode(text))
-            except Exception:
-                pass
+            except (KeyError, UnicodeError, ValueError):
+                logger.debug(
+                    "Token count estimation failed; using character heuristic",
+                    exc_info=True,
+                )
         # Fallback heuristic: approximate tokens as chars/4
         return max(1, int(len(text) / 4))
 
@@ -128,8 +131,8 @@ def embed_texts(texts: List[str], model_id: Optional[str] = None) -> List[List[f
         logger.info("Embedding response received: model=%s texts=%d", model, len(texts))
         return embeddings
 
-    except Exception as e:
-        logger.exception("Bedrock embedding invocation failed: %s", e)
+    except (BotoCoreError, KeyError, TypeError, ValueError):
+        logger.exception("Bedrock embedding invocation failed")
         raise
 
 
