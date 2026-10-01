@@ -1,11 +1,11 @@
 import os
-from typing import Any, List
+from typing import Any
 
 from fastapi import HTTPException
+from langchain_aws.chat_models import ChatBedrock
 
 from app.db_client import get_connection
 from app.embeddings import embed_texts
-from langchain_aws.chat_models import ChatBedrock
 
 
 def build_bedrock_llm():
@@ -27,10 +27,9 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
         "[" + ",".join(str(float(value)) for value in query_vector) + "]"
     )
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
                 SELECT id, document_name, chunk_text,
                        1 - (embedding <=> %s::vector) AS similarity
                 FROM doc_chunks
@@ -38,16 +37,16 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
                 ORDER BY embedding <=> %s::vector
                 LIMIT %s
                 """,
-                (embedding_literal, embedding_literal, top_k),
-            )
-            rows = cur.fetchall()
+            (embedding_literal, embedding_literal, top_k),
+        )
+        rows = cur.fetchall()
 
     if not rows:
         return {"context": "", "sources": [], "chunks": []}
 
-    chunks: List[dict[str, Any]] = []
-    sources: List[dict[str, Any]] = []
-    context_parts: List[str] = []
+    chunks: list[dict[str, Any]] = []
+    sources: list[dict[str, Any]] = []
+    context_parts: list[str] = []
     for chunk_id, document_name, chunk_text, similarity in rows:
         similarity_score = float(similarity) if similarity is not None else 0.0
         chunk_record = {

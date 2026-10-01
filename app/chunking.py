@@ -5,23 +5,29 @@ and split it into semantically coherent chunks using LangChain's recursive
 character text splitter.
 """
 
-from pathlib import Path
-from typing import Any, Dict, List
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 import logging
 import warnings
+from pathlib import Path
+from typing import Any
+
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+logger = logging.getLogger(__name__)
 
 # Import DB client using a relative import when running as a package,
 # falling back to absolute import when executed as a script.
 try:
     from .db_client import insert_chunks
-except Exception:
+except ImportError as err:
+    logger.error("Error importing db_client: %s", err)
     try:
         from db_client import insert_chunks
-    except Exception:
+    except ImportError as err:
+        logger.error("Error importing insert_chunks: %s", err)
+
         # Fallback dummy function if db_client is not present during standalone execution/testing
-        def insert_chunks(records: List[Dict[str, Any]]) -> None:
+        def insert_chunks(records: list[dict[str, Any]]) -> None:
             pass
 
 
@@ -34,24 +40,25 @@ warnings.filterwarnings(
 # Prefer langchain_community or modern LangChain integration modules
 try:
     from langchain_community.document_loaders import PyPDFLoader
-except Exception:
+except ImportError as err:
+    logger.error("Error importing PyPDFLoader from langchain_community: %s", err)
     try:
         from langchain_community import PyPDFLoader
-    except Exception:
+    except ImportError as err:
+        logger.error("Error importing PyPDFLoader from langchain_community: %s", err)
         raise ImportError(
             "PyPDFLoader could not be imported. Please install langchain-community and pypdf."
-        )
-
-
-logger = logging.getLogger(__name__)
+        ) from err
 
 # Try to import embedding helper; if missing, continue without embeddings
 try:
     from .embeddings import embed_texts
-except Exception:
+except ImportError as err:
+    logger.error("Error importing embed_texts: %s", err)
     try:
         from embeddings import embed_texts
-    except Exception:
+    except ImportError as err:
+        logger.error("Error importing embed_texts: %s", err)
         embed_texts = None
 
 
@@ -59,7 +66,7 @@ def chunk_pdf(
     pdf_path: str | Path,
     chunk_size: int = 800,
     chunk_overlap: int = 300,
-) -> List[Document]:
+) -> list[Document]:
     """Loads a PDF document and splits its content into manageable chunks.
 
     Args:
@@ -104,7 +111,7 @@ def chunk_pdf(
             r"\n(?=§\s*\d+)",  # Splits before section symbols, e.g., \n§ 1
             "\n\n",
             "\n",
-            "\. ",
+            r"\. ",
             " ",
             "",
         ],
@@ -146,8 +153,8 @@ def main(pdf_path: str, race_distance: float) -> None:
         logger.error("File not found: %s", err)
     except ValueError as err:
         logger.error("Validation error: %s", err)
-    except Exception as err:
-        logger.exception("An unexpected error occurred during processing: %s", err)
+    except Exception:
+        logger.exception("An unexpected error occurred during processing")
 
     else:
         # Executed ONLY when PDF processing succeeded without exceptions
@@ -176,14 +183,16 @@ def main(pdf_path: str, race_distance: float) -> None:
                             len(records),
                             len(vectors) if vectors else 0,
                         )
-                except Exception as emb_err:
-                    logger.warning("Failed to compute embeddings: %s", emb_err)
+                except Exception:
+                    logger.exception(
+                        "Failed to compute embeddings; continuing without them"
+                    )
 
             if records:
                 insert_chunks(records)
                 logger.info("Inserted %d chunks into the database.", len(records))
-        except Exception as e:
-            logger.warning("Failed to write chunks to DB: %s", e)
+        except Exception:
+            logger.exception("Failed to write chunks to DB")
 
 
 if __name__ == "__main__":

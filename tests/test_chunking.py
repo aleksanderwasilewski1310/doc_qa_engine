@@ -13,8 +13,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import app.chunking as chunking
 from langchain_core.documents import Document
+
+from app import chunking
 
 
 class TestChunkPdf(unittest.TestCase):
@@ -52,8 +53,11 @@ class TestChunkPdf(unittest.TestCase):
             temp_path = Path(temp_pdf.name)
 
         try:
-            with patch.object(chunking, "PyPDFLoader", FakeLoader), patch.object(
-                chunking, "RecursiveCharacterTextSplitter", FakeTextSplitter
+            with (
+                patch.object(chunking, "PyPDFLoader", FakeLoader),
+                patch.object(
+                    chunking, "RecursiveCharacterTextSplitter", FakeTextSplitter
+                ),
             ):
                 chunks = chunking.chunk_pdf(temp_path)
 

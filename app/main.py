@@ -1,15 +1,20 @@
-import os
-import json
 import base64
-import boto3
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from starlette.concurrency import run_in_threadpool
-import tempfile
+import json
+import logging
+import os
 import shutil
+import tempfile
 from pathlib import Path
+from typing import Annotated
+
+import boto3
+from botocore.exceptions import BotoCoreError
 from dotenv import load_dotenv
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 load_dotenv()  # Load environment variables from .env file
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Enterprise Multimodal Document QA Engine",
@@ -68,8 +73,8 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
 
         return str(result)
 
-    except Exception as e:
-        detail = f"SageMaker Inference Failure: {str(e)}"
+    except (AttributeError, BotoCoreError, KeyError, TypeError, ValueError) as e:
+        detail = f"SageMaker Inference Failure: {e!s}"
         if "Connection reset by peer" in str(e) or "ModelError" in str(e):
             detail = "SageMaker Inference Failure: the vision endpoint crashed or failed to process the request. Please check the SageMaker endpoint logs."
         raise HTTPException(status_code=500, detail=detail)
@@ -108,15 +113,15 @@ Response:"""
         )
         response_body = json.loads(response.get("body").read())
         return response_body["content"][0]["text"]
-    except Exception as e:
+    except (AttributeError, BotoCoreError, KeyError, TypeError, ValueError) as e:
         raise HTTPException(
-            status_code=500, detail=f"Bedrock Runtime Execution Error: {str(e)}"
+            status_code=500, detail=f"Bedrock Runtime Execution Error: {e!s}"
         )
 
 
 @app.post("/api/v1/query-document")
 async def process_document_query(
-    question: str = Form(...), file: UploadFile = File(...)
+    question: Annotated[str, Form()], file: Annotated[UploadFile, File()]
 ):
     """
     Ingest payload endpoint:
@@ -152,8 +157,8 @@ async def process_document_query(
 
 @app.post("/api/v1/upload-and-chunk")
 async def upload_and_chunk(
-    file: UploadFile = File(...),
-    race_distance: float = Form(...),
+    file: Annotated[UploadFile, File()],
+    race_distance: Annotated[float, Form()],
 ):
     """Upload a PDF and run the chunking pipeline (`chunking.main`).
 
@@ -170,19 +175,22 @@ async def upload_and_chunk(
         # Import here to avoid circular imports at module load time
         try:
             from . import chunking
-        except Exception:
+        except ImportError:
             import chunking
 
         # Run the synchronous chunking.main in a threadpool
         try:
             await run_in_threadpool(chunking.main, str(tmp_path), float(race_distance))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Chunking failed: {e}")
+        except Exception as err:
+            logger.exception("Chunking failed")
+            raise HTTPException(
+                status_code=500, detail=f"Chunking failed: {err}"
+            ) from err
 
         return {"status": "success", "filename": file.filename}
     finally:
         # Clean up temporary files
         try:
             shutil.rmtree(tempdir)
-        except Exception:
+        except OSError:
             pass

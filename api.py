@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import boto3
-from typing import Any
-
-import uvicorn
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Annotated, Any
 
-from starlette.concurrency import run_in_threadpool
+import boto3
+import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
-from app.rag import answer_question
 from app.chunking import main as chunk_main
+from app.rag import answer_question
 from app.ragas_eval import evaluate_rag
 
 S3_BUCKET_NAME = "enterprise-document-storage-prod-eu-central-1"
@@ -44,8 +43,8 @@ def healthcheck() -> dict[str, str]:
 
 @app.post("/upload")
 async def upload_and_chunk(
-    file: UploadFile = File(...),
-    distance: float = Form(...),
+    file: Annotated[UploadFile, File()],
+    distance: Annotated[float, Form()],
 ):
     """Upload PDF, chunk it, and store chunks in the database."""
 
