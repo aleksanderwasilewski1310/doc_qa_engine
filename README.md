@@ -304,6 +304,27 @@ services:
     command: uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
+From the project root, start the API with Docker Compose:
+
+```powershell
+docker compose -f docker/docker-compose.loader.yml up --build
+```
+
+Open `http://localhost:8000/docs` for the interactive API documentation, or `http://localhost:8000/health` to check that the API is running. To run it in the background and follow its logs:
+
+```powershell
+docker compose -f docker/docker-compose.loader.yml up --build -d
+docker compose -f docker/docker-compose.loader.yml logs -f
+```
+
+Stop the container with:
+
+```powershell
+docker compose -f docker/docker-compose.loader.yml down
+```
+
+The Compose file starts the API only. Endpoints that use AWS or PostgreSQL also require those services to be reachable and credentials/configuration to be available inside the container.
+
 ## Notes
 
 - The old split entry-point files were removed in favor of the single app module `api.py`.
