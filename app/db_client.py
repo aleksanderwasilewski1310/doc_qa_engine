@@ -6,11 +6,11 @@ import psycopg
 
 def _get_db_config():
     return {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", "5433")),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
-        "dbname": os.getenv("POSTGRES_DB", "postgres"),
+        "host": os.getenv("DB_HOST", "localhost"),
+        "port": int(os.getenv("DB_PORT", "5433")),
+        "user": os.getenv("DB_USER", "postgres"),
+        "password": os.getenv("DB_PASSWORD", "postgres"),
+        "dbname": os.getenv("DB_NAME", "postgres"),
     }
 
 

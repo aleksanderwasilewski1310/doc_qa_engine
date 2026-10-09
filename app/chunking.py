@@ -151,10 +151,13 @@ def main(pdf_path: str, race_distance: float) -> None:
 
     except FileNotFoundError as err:
         logger.error("File not found: %s", err)
+        raise
     except ValueError as err:
         logger.error("Validation error: %s", err)
+        raise
     except Exception:
         logger.exception("An unexpected error occurred during processing")
+        raise
 
     else:
         # Executed ONLY when PDF processing succeeded without exceptions
@@ -193,6 +196,7 @@ def main(pdf_path: str, race_distance: float) -> None:
                 logger.info("Inserted %d chunks into the database.", len(records))
         except Exception:
             logger.exception("Failed to write chunks to DB")
+            raise
 
 
 if __name__ == "__main__":
