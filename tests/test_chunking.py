@@ -88,6 +88,22 @@ class TestChunkPdf(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             chunking.chunk_pdf(missing_path)
 
+    def test_main_propagates_database_write_failure(self):
+        chunk = Document(
+            page_content="A chunk of text.",
+            metadata={"file_name": "sample.pdf"},
+        )
+
+        with (
+            patch.object(chunking, "chunk_pdf", return_value=[chunk]),
+            patch.object(chunking, "embed_texts", None),
+            patch.object(
+                chunking, "insert_chunks", side_effect=RuntimeError("database down")
+            ),
+            self.assertRaisesRegex(RuntimeError, "database down"),
+        ):
+            chunking.main("sample.pdf", 10.0)
+
 
 if __name__ == "__main__":
     unittest.main()
