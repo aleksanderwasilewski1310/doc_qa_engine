@@ -191,6 +191,8 @@ erDiagram
 
   Review the plan before applying: Terraform operates on all resources configured in the `infrastructure/` directory, not only the DynamoDB table. This table is provisioned independently; the current document retrieval workflow continues to store chunks in PostgreSQL with pgvector.
 
+  Terraform also configures `infrastructure/eventbridge.tf` to send `RUNNING` and `STOPPED` ECS task status notifications for the `doc_qa_engine` cluster to the existing SNS topic `SNSForEvents`. The topic must already exist in the AWS account and Region configured by the provider. The EventBridge rule and its IAM role/policy are included in the same `terraform plan` and can be deployed using the commands above.
+
 ## Storage and query behavior
 
 The active retrieval table is `doc_chunks`.
