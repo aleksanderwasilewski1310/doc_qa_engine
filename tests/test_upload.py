@@ -1,3 +1,5 @@
+"""Tests for the PDF upload endpoint."""
+
 import asyncio
 import unittest
 from io import BytesIO
@@ -9,11 +11,14 @@ import api
 
 
 class TestUploadEndpoint(unittest.TestCase):
+    """Verify uploaded files are stored before chunking."""
+
     def test_upload_stores_file_in_production_bucket_before_chunking(self):
+        """Store the PDF in S3 and invoke the chunking pipeline."""
         upload = UploadFile(filename="sample.pdf", file=BytesIO(b"pdf contents"))
 
         with (
-            patch.object(api.s3_client, "put_object") as put_object,
+            patch.object(api.S3_CLIENT, "put_object") as put_object,
             patch.object(api, "chunk_main") as chunk_main,
         ):
             result = asyncio.run(api.upload_and_chunk(upload, 10.0))

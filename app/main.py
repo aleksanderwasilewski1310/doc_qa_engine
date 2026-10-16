@@ -27,13 +27,13 @@ app = FastAPI(  # pylint: disable=invalid-name
 )
 
 # Initialize AWS SDK clients.
-# In production, these rely on IAM Roles assigned to the container execution environment (e.g., ECS Task Role).
+# In ECS, these clients use the IAM role assigned to the task.
 REGION = os.getenv("AWS_REGION", "eu-central-1")
 
-# Client for invoking low-latency SageMaker endpoints running custom inference containers inside the VPC
+# SageMaker client for invoking low-latency inference endpoints in the VPC.
 SAGEMAKER_RUNTIME = boto3.client("sagemaker-runtime", region_name=REGION)
 
-# Client for calling foundation models (e.g., Claude 3.5 Sonnet) via managed API (AWS Bedrock) over PrivateLink
+# Bedrock client for calling foundation models over PrivateLink.
 BEDROCK_RUNTIME = boto3.client("bedrock-runtime", region_name=REGION)
 
 # Client for encrypted object storage operations
@@ -49,7 +49,7 @@ S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "enterprise-document-storage-dev")
 def invoke_sagemaker_vision(image_bytes: bytes) -> str:
     """
     Invokes the custom vision/OCR model deployed to the SageMaker endpoint.
-    The deployed Hugging Face container expects a JSON payload containing a base64-encoded image.
+    The Hugging Face container expects a JSON payload with a base64 image.
     """
     try:
         payload = {"inputs": base64.b64encode(image_bytes).decode("utf-8")}
@@ -79,11 +79,11 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
         return str(result)
 
     except (
-        AttributeError,
-        BotoCoreError,
-        KeyError,
-        TypeError,
-        ValueError,
+            AttributeError,
+            BotoCoreError,
+            KeyError,
+            TypeError,
+            ValueError,
     ) as error:
         detail = f"SageMaker Inference Failure: {error!s}"
         if "Connection reset by peer" in str(error) or "ModelError" in str(error):
@@ -92,7 +92,7 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
                 "failed to process the request. Please check the SageMaker "
                 "endpoint logs."
             )
-        raise HTTPException(status_code=500, detail=detail)
+        raise HTTPException(status_code=500, detail=detail) from error
 
 
 def generate_llm_response(prompt: str, context: str) -> str:
@@ -100,23 +100,34 @@ def generate_llm_response(prompt: str, context: str) -> str:
     Executes a contextual generation call against AWS Bedrock (Claude 3.5 Sonnet).
 
     Architectural Note:
-    Uses strict system prompts to constrain LLM scope to the extracted context (mitigating hallucination risks).
+    Strict system prompts constrain answers to the extracted context.
     """
-    formatted_prompt = f"""System: You are an enterprise technical documentation assistant.
-Answer EXCLUSIVELY using the context provided below from the ingested document/image.
-If the information is not present in the context, explicitly state that you cannot answer based on the provided data.
-
-Document Context:
-{context}
-
-User Inquiry: {prompt}
-Response:"""
+    formatted_prompt = "\n".join(
+        [
+            "System: You are an enterprise technical documentation assistant.",
+            (
+                "Answer EXCLUSIVELY using the context provided below from the "
+                "ingested document/image."
+            ),
+            (
+                "If the information is not present in the context, explicitly "
+                "state that you cannot answer based on the provided data."
+            ),
+            "",
+            "Document Context:",
+            context,
+            "",
+            f"User Inquiry: {prompt}",
+            "Response:",
+        ]
+    ) + "\n"
 
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 1000,
         "messages": [{"role": "user", "content": formatted_prompt}],
-        "temperature": 0.1,  # Low temperature to prioritize deterministic extraction over creativity
+        # Low temperature favors deterministic extraction over creativity.
+        "temperature": 0.1,
     }
 
     try:
@@ -129,15 +140,16 @@ Response:"""
         response_body = json.loads(response.get("body").read())
         return response_body["content"][0]["text"]
     except (
-        AttributeError,
-        BotoCoreError,
-        KeyError,
-        TypeError,
-        ValueError,
+            AttributeError,
+            BotoCoreError,
+            KeyError,
+            TypeError,
+            ValueError,
     ) as error:
         raise HTTPException(
-            status_code=500, detail=f"Bedrock Runtime Execution Error: {error!s}"
-        )
+            status_code=500,
+            detail=f"Bedrock Runtime Execution Error: {error!s}",
+        ) from error
 
 
 @app.post("/api/v1/query-document")
@@ -195,9 +207,9 @@ async def upload_and_chunk(
 
         # Import here to avoid circular imports at module load time
         try:
-            from . import chunking
+            from . import chunking  # pylint: disable=import-outside-toplevel
         except ImportError:
-            import chunking
+            import chunking  # pylint: disable=import-outside-toplevel
 
         # Run the synchronous chunking.main in a threadpool
         try:

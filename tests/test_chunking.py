@@ -5,28 +5,31 @@ ensuring PDF pages are split into chunks, and verifying that chunk metadata is
 attached to each returned LangChain document.
 """
 
-import sys
 import tempfile
-import unittest
 from pathlib import Path
+from unittest import TestCase, main
 from unittest.mock import patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from langchain_core.documents import Document
 
 from app import chunking
 
 
-class TestChunkPdf(unittest.TestCase):
+class TestChunkPdf(TestCase):
+    """Verify PDF validation, splitting, metadata, and write failures."""
+
     def test_chunk_pdf_splits_loaded_documents_and_adds_metadata(self):
         """Chunked documents should keep page content and receive chunk metadata."""
 
-        class FakeLoader:
+        class FakeLoader:  # pylint: disable=too-few-public-methods
+            """Minimal loader fake returning two deterministic pages."""
+
             def __init__(self, path):
+                """Store the source path used in fake page metadata."""
                 self.path = path
 
             def load(self):
+                """Return two fake PDF pages."""
                 return [
                     Document(
                         page_content="First paragraph.\n\nSecond paragraph.",
@@ -38,11 +41,16 @@ class TestChunkPdf(unittest.TestCase):
                     ),
                 ]
 
-        class FakeTextSplitter:
+        class FakeTextSplitter:  # pylint: disable=too-few-public-methods
+            """Minimal splitter fake that preserves each document."""
+
             def __init__(self, **kwargs):
+                """Retain splitter options for the patched dependency."""
                 self.kwargs = kwargs
 
-            def split_documents(self, docs):
+            @staticmethod
+            def split_documents(docs):
+                """Return document copies as separate chunks."""
                 return [
                     Document(page_content=doc.page_content, metadata=dict(doc.metadata))
                     for doc in docs
@@ -89,6 +97,7 @@ class TestChunkPdf(unittest.TestCase):
             chunking.chunk_pdf(missing_path)
 
     def test_main_propagates_database_write_failure(self):
+        """Database write errors should escape the chunking pipeline."""
         chunk = Document(
             page_content="A chunk of text.",
             metadata={"file_name": "sample.pdf"},
@@ -98,7 +107,9 @@ class TestChunkPdf(unittest.TestCase):
             patch.object(chunking, "chunk_pdf", return_value=[chunk]),
             patch.object(chunking, "embed_texts", None),
             patch.object(
-                chunking, "insert_chunks", side_effect=RuntimeError("database down")
+                chunking,
+                "insert_chunks",
+                side_effect=RuntimeError("database down"),
             ),
             self.assertRaisesRegex(RuntimeError, "database down"),
         ):
@@ -106,4 +117,4 @@ class TestChunkPdf(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

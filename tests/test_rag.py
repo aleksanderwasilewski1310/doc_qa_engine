@@ -1,14 +1,17 @@
-import unittest
+"""Tests for RAG answer fallback behavior."""
+
 from types import SimpleNamespace
+from unittest import TestCase, main
 from unittest.mock import patch
 
 from app import rag
 
 
-class FakeLLM:
+class FakeLLM:  # pylint: disable=too-few-public-methods
     """Simple LLM fake that provides a fallback answer on its second call."""
 
     def __init__(self):
+        """Initialize the prompt history."""
         self.calls = []
 
     def invoke(self, prompt):
@@ -21,13 +24,15 @@ class FakeLLM:
         return SimpleNamespace(content="The answer is in the second chunk.")
 
 
-class TestRagFallback(unittest.TestCase):
+class TestRagFallback(TestCase):
     """Tests for trying subsequent chunks when the first is insufficient."""
 
     @patch("app.rag.build_bedrock_llm")
     @patch("app.rag.retrieve_relevant_chunks")
     def test_answer_question_goes_to_next_chunk_when_first_is_not_relevant(
-        self, mock_retrieve, mock_llm_factory
+        self,
+        mock_retrieve,
+        mock_llm_factory,
     ):
         """Returns the answer found in the next relevant chunk."""
         mock_llm = FakeLLM()
@@ -59,4 +64,4 @@ class TestRagFallback(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
