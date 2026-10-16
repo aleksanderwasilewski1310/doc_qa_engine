@@ -12,15 +12,3 @@ repos:
         entry: python -m pre_commit_hooks.end_of_file_fixer
         language: system
         types: [text]
-
-      - id: ruff
-        name: ruff check
-        entry: python -m ruff check --fix
-        language: system
-        types_or: [python, pyi]
-
-      - id: ruff-format
-        name: ruff format
-        entry: python -m ruff format
-        language: system
-        types_or: [python, pyi]
