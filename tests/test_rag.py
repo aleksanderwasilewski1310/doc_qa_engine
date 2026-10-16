@@ -6,10 +6,13 @@ from app import rag
 
 
 class FakeLLM:
+    """Simple LLM fake that provides a fallback answer on its second call."""
+
     def __init__(self):
         self.calls = []
 
     def invoke(self, prompt):
+        """Record the prompt and return a predetermined response."""
         self.calls.append(prompt)
         if len(self.calls) == 1:
             return SimpleNamespace(
@@ -19,11 +22,14 @@ class FakeLLM:
 
 
 class TestRagFallback(unittest.TestCase):
+    """Tests for trying subsequent chunks when the first is insufficient."""
+
     @patch("app.rag.build_bedrock_llm")
     @patch("app.rag.retrieve_relevant_chunks")
     def test_answer_question_goes_to_next_chunk_when_first_is_not_relevant(
         self, mock_retrieve, mock_llm_factory
     ):
+        """Returns the answer found in the next relevant chunk."""
         mock_llm = FakeLLM()
         mock_llm_factory.return_value = mock_llm
         mock_retrieve.return_value = {

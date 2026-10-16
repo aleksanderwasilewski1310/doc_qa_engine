@@ -5,6 +5,7 @@
 ![AWS S3](https://img.shields.io/badge/AWS-S3-569A31?logo=amazons3&logoColor=white)
 ![AWS ECR](https://img.shields.io/badge/AWS-ECR-FF9900?logo=amazonaws&logoColor=white)
 ![AWS ECS](https://img.shields.io/badge/AWS-ECS-FF9900?logo=amazonaws&logoColor=white)
+![AWS EventBridge](https://img.shields.io/badge/AWS-EventBridge-FF9900?logo=amazonaws&logoColor=white)
 ![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-FF9900?logo=amazonaws&logoColor=white)
 ![PostgreSQL and pgvector](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)
 
@@ -13,6 +14,8 @@ This project is a FastAPI-based document ingestion and question answering system
 The application now uses a single entry point in `api.py`, where the upload and QA routes are exposed together. The ingestion and retrieval logic is separated into focused modules under `app/`.
 
 The API is containerized with `docker/Dockerfile.loader` and can be deployed as an Amazon ECS service using an image stored in Amazon ECR. The application uses AWS Bedrock for embeddings and answer generation, S3 for uploaded PDFs, and PostgreSQL with pgvector for chunk storage and retrieval.
+
+The project also includes an AWS EventBridge integration in `infrastructure/eventbridge.tf`. It monitors `RUNNING` and `STOPPED` task state changes for the `doc_qa_engine` ECS cluster and sends a formatted task ARN and status notification to the existing `SNSForEvents` SNS topic.
 
 ## Overview
 
@@ -45,6 +48,9 @@ flowchart LR
     Embeddings --> Bedrock[AWS Bedrock embeddings]
     RAG --> LLM[Claude via ChatBedrock]
     LLM --> Response[Answer returned to client]
+
+    ECS[doc_qa_engine ECS cluster] --> EventBridge[AWS EventBridge task state rule]
+    EventBridge --> SNS[SNSForEvents topic]
 ```
 
 ## Application structure
@@ -267,6 +273,10 @@ Then open:
 
 - `http://localhost:8000/docs`
 - `http://localhost:8000/health`
+
+## Codacy analysis
+
+The [Codacy Security Scan workflow](./.github/workflows/codacy.yml) runs on pushes and pull requests targeting `main`, and every Saturday at 14:18 UTC. It generates a SARIF report and uploads it to GitHub code scanning. Configure the repository secret `CODACY_PROJECT_TOKEN` for the scan action to authenticate; review workflow runs in **Actions** and findings in **Security → Code scanning**.
 
 ## Environment variables
 

@@ -1,3 +1,5 @@
+"""FastAPI endpoints for document ingestion and question answering."""
+
 import base64
 import json
 import logging
@@ -5,7 +7,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated  # pylint: disable=no-name-in-module
 
 import boto3
 from botocore.exceptions import BotoCoreError
@@ -14,25 +16,28 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 load_dotenv()  # Load environment variables from .env file
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
-app = FastAPI(
+app = FastAPI(  # pylint: disable=invalid-name
     title="Enterprise Multimodal Document QA Engine",
-    description="Isolated backend service handling multimodal document processing and LLM synthesis via private AWS infrastructure.",
+    description=(
+        "Isolated backend service handling multimodal document processing "
+        "and LLM synthesis via private AWS infrastructure."
+    ),
 )
 
 # Initialize AWS SDK clients.
 # In production, these rely on IAM Roles assigned to the container execution environment (e.g., ECS Task Role).
-region = os.getenv("AWS_REGION", "eu-central-1")
+REGION = os.getenv("AWS_REGION", "eu-central-1")
 
 # Client for invoking low-latency SageMaker endpoints running custom inference containers inside the VPC
-sagemaker_runtime = boto3.client("sagemaker-runtime", region_name=region)
+SAGEMAKER_RUNTIME = boto3.client("sagemaker-runtime", region_name=REGION)
 
 # Client for calling foundation models (e.g., Claude 3.5 Sonnet) via managed API (AWS Bedrock) over PrivateLink
-bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
+BEDROCK_RUNTIME = boto3.client("bedrock-runtime", region_name=REGION)
 
 # Client for encrypted object storage operations
-s3_client = boto3.client("s3", region_name=region)
+S3_CLIENT = boto3.client("s3", region_name=REGION)
 
 # Environment variables populated via ECS task definition
 SAGEMAKER_VISION_ENDPOINT = os.getenv(
@@ -49,7 +54,7 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
     try:
         payload = {"inputs": base64.b64encode(image_bytes).decode("utf-8")}
 
-        response = sagemaker_runtime.invoke_endpoint(
+        response = SAGEMAKER_RUNTIME.invoke_endpoint(
             EndpointName=SAGEMAKER_VISION_ENDPOINT,
             ContentType="application/json",
             Body=json.dumps(payload).encode("utf-8"),
@@ -73,10 +78,20 @@ def invoke_sagemaker_vision(image_bytes: bytes) -> str:
 
         return str(result)
 
-    except (AttributeError, BotoCoreError, KeyError, TypeError, ValueError) as e:
-        detail = f"SageMaker Inference Failure: {e!s}"
-        if "Connection reset by peer" in str(e) or "ModelError" in str(e):
-            detail = "SageMaker Inference Failure: the vision endpoint crashed or failed to process the request. Please check the SageMaker endpoint logs."
+    except (
+        AttributeError,
+        BotoCoreError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as error:
+        detail = f"SageMaker Inference Failure: {error!s}"
+        if "Connection reset by peer" in str(error) or "ModelError" in str(error):
+            detail = (
+                "SageMaker Inference Failure: the vision endpoint crashed or "
+                "failed to process the request. Please check the SageMaker "
+                "endpoint logs."
+            )
         raise HTTPException(status_code=500, detail=detail)
 
 
@@ -105,7 +120,7 @@ Response:"""
     }
 
     try:
-        response = bedrock_runtime.invoke_model(
+        response = BEDROCK_RUNTIME.invoke_model(
             modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
             contentType="application/json",
             accept="application/json",
@@ -113,9 +128,15 @@ Response:"""
         )
         response_body = json.loads(response.get("body").read())
         return response_body["content"][0]["text"]
-    except (AttributeError, BotoCoreError, KeyError, TypeError, ValueError) as e:
+    except (
+        AttributeError,
+        BotoCoreError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as error:
         raise HTTPException(
-            status_code=500, detail=f"Bedrock Runtime Execution Error: {e!s}"
+            status_code=500, detail=f"Bedrock Runtime Execution Error: {error!s}"
         )
 
 
@@ -134,7 +155,7 @@ async def process_document_query(
 
     # Secure object storage write using Server-Side Encryption (SSE-KMS)
     s3_key = f"uploads/{file.filename}"
-    s3_client.put_object(
+    S3_CLIENT.put_object(
         Bucket=S3_BUCKET_NAME,
         Key=s3_key,
         Body=file_bytes,
@@ -182,7 +203,7 @@ async def upload_and_chunk(
         try:
             await run_in_threadpool(chunking.main, str(tmp_path), float(race_distance))
         except Exception as err:
-            logger.exception("Chunking failed")
+            LOGGER.exception("Chunking failed")
             raise HTTPException(
                 status_code=500, detail=f"Chunking failed: {err}"
             ) from err

@@ -14,7 +14,7 @@ def test_invoke_sagemaker_vision_uses_raw_image_bytes(monkeypatch):
             captured.update(kwargs)
             return {"Body": lambda: None}
 
-    monkeypatch.setattr("app.main.sagemaker_runtime", FakeRuntime())
+    monkeypatch.setattr("app.main.SAGEMAKER_RUNTIME", FakeRuntime())
     monkeypatch.setattr("app.main.SAGEMAKER_VISION_ENDPOINT", "test-endpoint")
 
     class FakeBody:
@@ -24,14 +24,14 @@ def test_invoke_sagemaker_vision_uses_raw_image_bytes(monkeypatch):
     class FakeResponse:
         Body = FakeBody()
 
-    monkeypatch.setattr("app.main.sagemaker_runtime", FakeRuntime())
+    monkeypatch.setattr("app.main.SAGEMAKER_RUNTIME", FakeRuntime())
 
     def fake_invoke_endpoint(**kwargs):
         captured.update(kwargs)
         return {"Body": FakeBody()}
 
     monkeypatch.setattr(
-        "app.main.sagemaker_runtime",
+        "app.main.SAGEMAKER_RUNTIME",
         type("Runtime", (), {"invoke_endpoint": fake_invoke_endpoint})(),
     )
 

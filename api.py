@@ -7,8 +7,8 @@ from typing import Annotated, Any
 
 import boto3
 import uvicorn
-from fastapi import FastAPI, File, Form, UploadFile
-from pydantic import BaseModel
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.chunking import main as chunk_main
@@ -24,16 +24,38 @@ app = FastAPI(
 )
 
 
+def _safe_uploaded_filename(filename: str | None) -> str:
+    if filename is None or not filename.strip():
+        raise HTTPException(status_code=400, detail="A filename is required.")
+
+    safe_name = Path(filename).name
+    if not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+    if not safe_name.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF uploads are supported.")
+
+    return safe_name
+
+
+def _validated_distance(distance: float) -> float:
+    if not distance or not float(distance).is_finite() or float(distance) <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Distance must be a positive finite number.",
+        )
+    return float(distance)
+
+
 class AskRequest(BaseModel):
-    question: str
-    top_k: int = 5
+    question: str = Field(..., min_length=1, max_length=4000)
+    top_k: int = Field(default=5, gt=0)
 
 
 class EvaluationRequest(BaseModel):
-    question: str
-    answer: str
-    contexts: list[str]
-    ground_truth: str | None = None
+    question: str = Field(..., min_length=1, max_length=4000)
+    answer: str = Field(..., min_length=1, max_length=40000)
+    contexts: list[str] = Field(..., min_length=1)
+    ground_truth: str | None = Field(default=None, max_length=40000)
 
 
 @app.get("/health")
@@ -48,22 +70,22 @@ async def upload_and_chunk(
 ):
     """Upload PDF, chunk it, and store chunks in the database."""
 
-    if file.filename is None:
-        raise ValueError("No filename provided for upload.")
+    safe_name = _safe_uploaded_filename(file.filename)
+    validated_distance = _validated_distance(float(distance))
 
     tmpdir = tempfile.mkdtemp(prefix="loader_api_")
-    target_path = Path(tmpdir) / file.filename
+    target_path = Path(tmpdir) / safe_name
 
     try:
         contents = await file.read()
-        s3_key = f"uploads/{file.filename}"
+        s3_key = f"uploads/{safe_name}"
         s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=s3_key, Body=contents)
         target_path.write_bytes(contents)
-        await run_in_threadpool(chunk_main, str(target_path), float(distance))
+        await run_in_threadpool(chunk_main, str(target_path), validated_distance)
         return {
             "status": "success",
-            "filename": file.filename,
-            "distance": float(distance),
+            "filename": safe_name,
+            "distance": validated_distance,
             "s3_location": f"s3://{S3_BUCKET_NAME}/{s3_key}",
         }
     finally:
@@ -72,16 +94,26 @@ async def upload_and_chunk(
 
 @app.post("/api/v1/ask")
 async def ask_question(payload: AskRequest) -> dict[str, Any]:
-    return answer_question(payload.question, top_k=payload.top_k)
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    return answer_question(question, top_k=payload.top_k)
 
 
 @app.post("/api/v1/ask-form")
 async def ask_question_form(question: str, top_k: int = 5) -> dict[str, Any]:
-    return answer_question(question, top_k=top_k)
+    normalized_question = question.strip()
+    if not normalized_question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    if top_k <= 0:
+        raise HTTPException(status_code=400, detail="top_k must be a positive integer.")
+    return answer_question(normalized_question, top_k=top_k)
 
 
 @app.post("/api/v1/evaluate")
 async def evaluate_rag_endpoint(payload: EvaluationRequest) -> dict[str, Any]:
+    if not payload.contexts or any(not context.strip() for context in payload.contexts):
+        raise HTTPException(status_code=400, detail="At least one non-empty context is required.")
     return evaluate_rag(
         question=payload.question,
         answer=payload.answer,
