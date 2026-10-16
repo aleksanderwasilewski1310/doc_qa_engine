@@ -1,6 +1,9 @@
+"""pgvector retrieval and context-grounded answer generation."""
+
 import os
 from typing import Any
 
+import boto3
 from fastapi import HTTPException
 from langchain_aws.chat_models import ChatBedrock
 
@@ -9,8 +12,7 @@ from app.embeddings import embed_texts
 
 
 def build_bedrock_llm():
-    import boto3
-
+    """Create a Bedrock-backed chat model using the configured AWS region."""
     region = os.getenv("AWS_REGION", "eu-central-1")
     client = boto3.client("bedrock-runtime", region_name=region)
     return ChatBedrock(
@@ -18,6 +20,39 @@ def build_bedrock_llm():
         client=client,
         model_kwargs={"temperature": 0.1},
     )
+
+
+def _format_retrieval_results(
+    rows: list[tuple[Any, Any, Any, Any]],
+) -> dict[str, Any]:
+    """Build sorted context, source, and chunk results from database rows."""
+    chunks = []
+    for chunk_id, document_name, chunk_text, similarity in rows:
+        similarity_score = float(similarity) if similarity is not None else 0.0
+        chunks.append(
+            {
+                "id": chunk_id,
+                "document_name": document_name,
+                "chunk_text": chunk_text,
+                "similarity": round(similarity_score, 4),
+            }
+        )
+
+    chunks.sort(key=lambda item: item["similarity"], reverse=True)
+    context_parts = [
+        f"[Source: {chunk['document_name']}]\n{chunk['chunk_text']}"
+        for chunk in chunks
+    ]
+    sources = [
+        {
+            "id": chunk["id"],
+            "document_name": chunk["document_name"],
+            "similarity": chunk["similarity"],
+            "text": chunk["chunk_text"],
+        }
+        for chunk in chunks
+    ]
+    return {"context": "\n\n".join(context_parts), "sources": sources, "chunks": chunks}
 
 
 def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
@@ -44,42 +79,7 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
     if not rows:
         return {"context": "", "sources": [], "chunks": []}
 
-    chunks: list[dict[str, Any]] = []
-    sources: list[dict[str, Any]] = []
-    context_parts: list[str] = []
-    for chunk_id, document_name, chunk_text, similarity in rows:
-        similarity_score = float(similarity) if similarity is not None else 0.0
-        chunk_record = {
-            "id": chunk_id,
-            "document_name": document_name,
-            "chunk_text": chunk_text,
-            "similarity": round(similarity_score, 4),
-        }
-        chunks.append(chunk_record)
-        context_parts.append(f"[Source: {document_name}]\n{chunk_text}")
-        sources.append(
-            {
-                "id": chunk_id,
-                "document_name": document_name,
-                "similarity": round(similarity_score, 4),
-            }
-        )
-
-    chunks = sorted(chunks, key=lambda item: item["similarity"], reverse=True)
-    context_parts = [
-        f"[Source: {chunk['document_name']}]\n{chunk['chunk_text']}" for chunk in chunks
-    ]
-    sources = [
-        {
-            "id": chunk["id"],
-            "document_name": chunk["document_name"],
-            "similarity": chunk["similarity"],
-            "text": chunk["chunk_text"],
-        }
-        for chunk in chunks
-    ]
-
-    return {"context": "\n\n".join(context_parts), "sources": sources, "chunks": chunks}
+    return _format_retrieval_results(rows)
 
 
 def _extract_answer_text(response: Any) -> str:
@@ -111,28 +111,31 @@ def answer_question(question: str, top_k: int = 5) -> dict[str, Any]:
     chunks = retrieval.get("chunks") or []
     if not chunks:
         return {
-            "answer": "I could not find relevant information in the indexed database for this question.",
+            "answer": (
+                "I could not find relevant information in the indexed database "
+                "for this question."
+            ),
             "context": "",
             "sources": [],
         }
 
     combined_context = "\n\n".join(
-        f"[Source: {chunk['document_name']}]\n{chunk['chunk_text']}" for chunk in chunks
+        f"[Source: {chunk['document_name']}]\n{chunk['chunk_text']}"
+        for chunk in chunks
     )
     llm = build_bedrock_llm()
 
-    prompt = f"""
-You are a careful document question-answering assistant.
-Answer using only the context below. Your answer MUST BE short and precise.
-If the answer is not present in the context, say that it cannot be determined from the provided data.
-The strongest match is listed first in the context below.
-
-Context:
-{combined_context}
-
-Question:
-{question}
-"""
+    prompt = (
+        "\nYou are a careful document question-answering assistant.\n"
+        "Answer using only the context below. Your answer MUST BE short and precise.\n"
+        "If the answer is not present in the context, say that it cannot be determined "
+        "from the provided data.\n"
+        "The strongest match is listed first in the context below.\n\n"
+        "Context:\n"
+        f"{combined_context}\n\n"
+        "Question:\n"
+        f"{question}\n"
+    )
 
     response = llm.invoke(prompt)
     answer_text = _extract_answer_text(response)

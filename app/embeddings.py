@@ -5,8 +5,6 @@ Reads AWS credentials from environment (optionally via .env) and provides
 or Cohere Embed.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -17,7 +15,7 @@ from botocore.exceptions import BotoCoreError
 from dotenv import load_dotenv
 
 load_dotenv()
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def _get_bedrock_client():
@@ -70,7 +68,9 @@ def _embed_cohere_multilingual(
     return response_body["embeddings"]
 
 
-def embed_texts(texts: list[str], model_id: str | None = None) -> list[list[float]]:
+def embed_texts(
+    texts: list[str], model_id: str | None = None
+) -> list[list[float]]:
     """Return embeddings for the provided list of texts using AWS Bedrock.
 
     Args:
@@ -101,7 +101,7 @@ def embed_texts(texts: list[str], model_id: str | None = None) -> list[list[floa
                     enc = tiktoken.get_encoding("cl100k_base")
                 return len(enc.encode(text))
             except (KeyError, UnicodeError, ValueError):
-                logger.debug(
+                LOGGER.debug(
                     "Token count estimation failed; using character heuristic",
                     exc_info=True,
                 )
@@ -110,7 +110,7 @@ def embed_texts(texts: list[str], model_id: str | None = None) -> list[list[floa
 
     token_counts = [_count_tokens(t) for t in texts]
     total_tokens = sum(token_counts)
-    logger.info(
+    LOGGER.info(
         "Embedding request: model=%s texts=%d total_tokens=%d",
         model,
         len(texts),
@@ -128,11 +128,11 @@ def embed_texts(texts: list[str], model_id: str | None = None) -> list[list[floa
             vector = _embed_single_text_titan(text, client, model)
             embeddings.append(vector)
 
-        logger.info("Embedding response received: model=%s texts=%d", model, len(texts))
+        LOGGER.info("Embedding response received: model=%s texts=%d", model, len(texts))
         return embeddings
 
     except (BotoCoreError, KeyError, TypeError, ValueError):
-        logger.exception("Bedrock embedding invocation failed")
+        LOGGER.exception("Bedrock embedding invocation failed")
         raise
 
 

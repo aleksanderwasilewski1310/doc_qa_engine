@@ -13,22 +13,23 @@ from typing import Any
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 # Import DB client using a relative import when running as a package,
 # falling back to absolute import when executed as a script.
 try:
     from .db_client import insert_chunks
 except ImportError as err:
-    logger.error("Error importing db_client: %s", err)
+    LOGGER.error("Error importing db_client: %s", err)
     try:
         from db_client import insert_chunks
-    except ImportError as err:
-        logger.error("Error importing insert_chunks: %s", err)
+    except ImportError as fallback_error:
+        LOGGER.error("Error importing insert_chunks: %s", fallback_error)
 
         # Fallback dummy function if db_client is not present during standalone execution/testing
-        def insert_chunks(records: list[dict[str, Any]]) -> None:
-            pass
+        def insert_chunks(_records: list[dict[str, Any]]) -> None:
+            """Allow chunking to run when database support is unavailable."""
+            return
 
 
 # Suppress noisy DeprecationWarnings from langchain_community which may be
@@ -41,11 +42,14 @@ warnings.filterwarnings(
 try:
     from langchain_community.document_loaders import PyPDFLoader
 except ImportError as err:
-    logger.error("Error importing PyPDFLoader from langchain_community: %s", err)
+    LOGGER.error("Error importing PyPDFLoader from langchain_community: %s", err)
     try:
         from langchain_community import PyPDFLoader
-    except ImportError as err:
-        logger.error("Error importing PyPDFLoader from langchain_community: %s", err)
+    except ImportError as fallback_error:
+        LOGGER.error(
+            "Error importing PyPDFLoader from langchain_community: %s",
+            fallback_error,
+        )
         raise ImportError(
             "PyPDFLoader could not be imported. Please install langchain-community and pypdf."
         ) from err
@@ -54,11 +58,11 @@ except ImportError as err:
 try:
     from .embeddings import embed_texts
 except ImportError as err:
-    logger.error("Error importing embed_texts: %s", err)
+    LOGGER.error("Error importing embed_texts: %s", err)
     try:
         from embeddings import embed_texts
-    except ImportError as err:
-        logger.error("Error importing embed_texts: %s", err)
+    except ImportError as fallback_error:
+        LOGGER.error("Error importing embed_texts: %s", fallback_error)
         embed_texts = None
 
 
@@ -133,6 +137,27 @@ def chunk_pdf(
     return chunked_documents
 
 
+def _attach_embeddings(records: list[dict[str, Any]]) -> None:
+    """Attach vectors when embedding support is available; log and continue on failure."""
+    if embed_texts is None or not records:
+        return
+
+    try:
+        texts = [record["chunk_text"] for record in records]
+        vectors = embed_texts(texts)
+        if vectors and len(vectors) == len(records):
+            for record, vector in zip(records, vectors):
+                record["embedding"] = vector
+        else:
+            LOGGER.warning(
+                "Embedding count mismatch: %d texts -> %d vectors",
+                len(records),
+                len(vectors) if vectors else 0,
+            )
+    except Exception:  # pylint: disable=broad-exception-caught
+        LOGGER.exception("Failed to compute embeddings; continuing without them")
+
+
 def main(pdf_path: str, race_distance: float) -> None:
     """Example execution entry point."""
     sample_pdf_path = pdf_path
@@ -147,56 +172,38 @@ def main(pdf_path: str, race_distance: float) -> None:
         for chunk in chunks:
             chunk.metadata["race_distance"] = race_distance
 
-        logger.info("Successfully processed PDF. Created %d chunks.", len(chunks))
+        LOGGER.info("Successfully processed PDF. Created %d chunks.", len(chunks))
 
     except FileNotFoundError as err:
-        logger.error("File not found: %s", err)
+        LOGGER.error("File not found: %s", err)
         raise
     except ValueError as err:
-        logger.error("Validation error: %s", err)
+        LOGGER.error("Validation error: %s", err)
         raise
     except Exception:
-        logger.exception("An unexpected error occurred during processing")
+        LOGGER.exception("An unexpected error occurred during processing")
         raise
 
-    else:
-        # Executed ONLY when PDF processing succeeded without exceptions
-        try:
-            records = [
-                {
-                    "document_name": c.metadata.get("file_name", Path(pdf_path).name),
-                    "chunk_text": c.page_content,
-                    "distance": c.metadata.get("race_distance"),
-                }
-                for c in chunks
-            ]
+    try:
+        records = [
+            {
+                "document_name": chunk.metadata.get(
+                    "file_name", Path(pdf_path).name
+                ),
+                "chunk_text": chunk.page_content,
+                "distance": chunk.metadata.get("race_distance"),
+            }
+            for chunk in chunks
+        ]
 
-            # If embedding support is available, compute embeddings in batch and attach to records
-            if embed_texts is not None and records:
-                try:
-                    texts = [r["chunk_text"] for r in records]
-                    vectors = embed_texts(texts)
-                    # Ensure vectors length matches
-                    if vectors and len(vectors) == len(records):
-                        for r, v in zip(records, vectors):
-                            r["embedding"] = v
-                    else:
-                        logger.warning(
-                            "Embedding count mismatch: %d texts -> %d vectors",
-                            len(records),
-                            len(vectors) if vectors else 0,
-                        )
-                except Exception:
-                    logger.exception(
-                        "Failed to compute embeddings; continuing without them"
-                    )
+        _attach_embeddings(records)
 
-            if records:
-                insert_chunks(records)
-                logger.info("Inserted %d chunks into the database.", len(records))
-        except Exception:
-            logger.exception("Failed to write chunks to DB")
-            raise
+        if records:
+            insert_chunks(records)
+            LOGGER.info("Inserted %d chunks into the database.", len(records))
+    except Exception:
+        LOGGER.exception("Failed to write chunks to DB")
+        raise
 
 
 if __name__ == "__main__":
@@ -207,6 +214,9 @@ if __name__ == "__main__":
     )
 
     main(
-        pdf_path=r"C:\\Users\\awasi\\Downloads\\Regulamin-Nice-To-Fit-You-Warszawskiej-Dychy_2026.pdf",
+        pdf_path=(
+            r"C:\\Users\\awasi\\Downloads\\"
+            "Regulamin-Nice-To-Fit-You-Warszawskiej-Dychy_2026.pdf"
+        ),
         race_distance=10.0,
     )

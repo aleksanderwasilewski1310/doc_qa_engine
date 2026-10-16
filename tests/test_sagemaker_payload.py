@@ -1,43 +1,31 @@
-import sys
-from pathlib import Path
+"""Tests for the SageMaker vision endpoint request and response handling."""
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import base64
+import json
+from io import BytesIO
+from types import SimpleNamespace
 
 from app.main import invoke_sagemaker_vision
 
 
 def test_invoke_sagemaker_vision_uses_raw_image_bytes(monkeypatch):
+    """Send the image bytes as base64 and return the extracted text."""
     captured = {}
-
-    class FakeRuntime:
-        def invoke_endpoint(self, **kwargs):
-            captured.update(kwargs)
-            return {"Body": lambda: None}
-
-    monkeypatch.setattr("app.main.SAGEMAKER_RUNTIME", FakeRuntime())
-    monkeypatch.setattr("app.main.SAGEMAKER_VISION_ENDPOINT", "test-endpoint")
-
-    class FakeBody:
-        def read(self):
-            return b'{"extracted_text": "hello"}'
-
-    class FakeResponse:
-        Body = FakeBody()
-
-    monkeypatch.setattr("app.main.SAGEMAKER_RUNTIME", FakeRuntime())
 
     def fake_invoke_endpoint(**kwargs):
         captured.update(kwargs)
-        return {"Body": FakeBody()}
+        return {"Body": BytesIO(b'{"extracted_text": "hello"}')}
 
     monkeypatch.setattr(
         "app.main.SAGEMAKER_RUNTIME",
-        type("Runtime", (), {"invoke_endpoint": fake_invoke_endpoint})(),
+        SimpleNamespace(invoke_endpoint=fake_invoke_endpoint),
     )
+    monkeypatch.setattr("app.main.SAGEMAKER_VISION_ENDPOINT", "test-endpoint")
 
     result = invoke_sagemaker_vision(b"fake-image")
 
     assert result == "hello"
     assert captured["EndpointName"] == "test-endpoint"
     assert captured["ContentType"] == "application/json"
-    assert b'"name": "image"' in captured["Body"]
+    payload = json.loads(captured["Body"])
+    assert payload["inputs"] == base64.b64encode(b"fake-image").decode("utf-8")
