@@ -1,5 +1,6 @@
 repos:
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
         name: trim trailing whitespace
@@ -12,3 +13,11 @@ repos:
         entry: python -m pre_commit_hooks.end_of_file_fixer
         language: system
         types: [text]
+
+  - repo: local
+    hooks:
+      - id: codacy
+        name: Codacy
+        entry: codacy-analysis analyze --staged
+        language: system
+        pass_filenames: false
