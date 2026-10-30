@@ -5,11 +5,13 @@ from huggingface_hub import snapshot_download
 
 MODEL_DIR = "./model_files"
 CODE_DIR = os.path.join(MODEL_DIR, "code")
+MODEL_REVISION = "59270604e602d5094b8d344298053f9fd3979dcf"
 
 # 1. Download TrOCR model weights and configuration from Hugging Face
 print("Downloading model weights...")
 snapshot_download(
     repo_id="microsoft/trocr-base-stage1",
+    revision=MODEL_REVISION,
     local_dir=MODEL_DIR,
     local_dir_use_symlinks=False,
 )
