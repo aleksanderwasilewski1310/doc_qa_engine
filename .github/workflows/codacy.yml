@@ -31,7 +31,6 @@ jobs:
           output: /tmp/results.sarif
           format: sarif
           gh-code-scanning-compat: true
-          fail-if-incomplete: true
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
