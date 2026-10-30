@@ -30,9 +30,9 @@ class TestRagFallback(TestCase):
     @patch("app.rag.build_bedrock_llm")
     @patch("app.rag.retrieve_relevant_chunks")
     def test_answer_question_goes_to_next_chunk_when_first_is_not_relevant(
-        self,
-        mock_retrieve,
-        mock_llm_factory,
+            self,
+            mock_retrieve,
+            mock_llm_factory,
     ):
         """Returns the answer found in the next relevant chunk."""
         mock_llm = FakeLLM()

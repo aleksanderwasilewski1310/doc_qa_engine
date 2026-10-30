@@ -154,7 +154,7 @@ def _attach_embeddings(records: list[dict[str, Any]]) -> None:
                 len(records),
                 len(vectors) if vectors else 0,
             )
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception:  # pylint: disable=broad-except
         LOGGER.exception("Failed to compute embeddings; continuing without them")
 
 
