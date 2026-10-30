@@ -2,66 +2,54 @@ name: Codacy Security Scan
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '18 14 * * 6'
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  codacy-security-scan:
+  codacy:
+    name: Codacy Analysis
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
       actions: read
-    name: Codacy Security Scan
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Run Codacy Analysis CLI
-        uses: codacy/codacy-analysis-cli-action@d840f886c4bd4edc059706d09c6a1586111c540b
+      - name: Run Codacy analysis
+        uses: codacy/codacy-analysis-cli-action@6f415a0d3790c227a9cff580098545188e0f4e5a
+        env:
+          DOCKER_API_VERSION: "1.40"
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
           verbose: true
-          output: results.sarif
+          output: /tmp/results.sarif
           format: sarif
           gh-code-scanning-compat: true
-          max-allowed-issues: 2147483647
-      
-      - name: Debug SARIF report
-        if: always()
+
+      - name: Assign unique SARIF categories
         run: |
-          python - <<'PY'
-          import json
-          import os
+          jq -e '
+            if (.runs | length) == 0 then
+              error("SARIF report contains no runs")
+            else
+              .runs |= (to_entries | map(
+                . as $entry
+                | .value.automationDetails = (
+                    (.value.automationDetails // {})
+                    + {"id": ("codacy-run-" + ($entry.key | tostring))}
+                  )
+                | .value
+              ))
+            end
+          ' /tmp/results.sarif > /tmp/results-upload.sarif
 
-          path = "results.sarif"
-
-          print("File exists:", os.path.exists(path))
-
-          if not os.path.exists(path):
-              exit(1)
-
-          print("File size:", os.path.getsize(path))
-
-          with open(path, encoding="utf-8") as f:
-              data = json.load(f)
-
-          print("SARIF version:", data.get("version"))
-          print("Runs:", len(data.get("runs", [])))
-
-          for run in data.get("runs", []):
-              driver = run.get("tool", {}).get("driver", {})
-              print("Tool:", driver.get("name"))
-              print("Results:", len(run.get("results", [])))
-          PY
-
-      - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v4.39.1
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: results.sarif
+          sarif_file: /tmp/results-upload.sarif
