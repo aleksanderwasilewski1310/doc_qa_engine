@@ -21,10 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Codacy Analysis CLI
         uses: codacy/codacy-analysis-cli-action@d840f886c4bd4edc059706d09c6a1586111c540b
+        env:
+          DOCKER_API_VERSION: "1.40"
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
           verbose: true
