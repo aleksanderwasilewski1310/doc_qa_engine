@@ -32,7 +32,24 @@ jobs:
           format: sarif
           gh-code-scanning-compat: true
 
+      - name: Assign unique SARIF categories
+        run: |
+          jq -e '
+            if (.runs | length) == 0 then
+              error("SARIF report contains no runs")
+            else
+              .runs |= (to_entries | map(
+                . as $entry
+                | .value.automationDetails = (
+                    (.value.automationDetails // {})
+                    + {"id": ("codacy-run-" + ($entry.key | tostring))}
+                  )
+                | .value
+              ))
+            end
+          ' /tmp/results.sarif > /tmp/results-upload.sarif
+
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: /tmp/results.sarif
+          sarif_file: /tmp/results-upload.sarif
