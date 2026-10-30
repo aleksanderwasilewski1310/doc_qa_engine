@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import tempfile
+from importlib import import_module
 from pathlib import Path
 from typing import Annotated  # pylint: disable=no-name-in-module
 
@@ -154,7 +155,7 @@ def generate_llm_response(prompt: str, context: str) -> str:
 
 @app.post("/api/v1/query-document")
 async def process_document_query(
-    question: Annotated[str, Form()], file: Annotated[UploadFile, File()]
+        question: Annotated[str, Form()], file: Annotated[UploadFile, File()]
 ):
     """
     Ingest payload endpoint:
@@ -190,8 +191,8 @@ async def process_document_query(
 
 @app.post("/api/v1/upload-and-chunk")
 async def upload_and_chunk(
-    file: Annotated[UploadFile, File()],
-    race_distance: Annotated[float, Form()],
+        file: Annotated[UploadFile, File()],
+        race_distance: Annotated[float, Form()],
 ):
     """Upload a PDF and run the chunking pipeline (`chunking.main`).
 
@@ -206,10 +207,13 @@ async def upload_and_chunk(
         tmp_path.write_bytes(contents)
 
         # Import here to avoid circular imports at module load time
-        try:
-            from . import chunking  # pylint: disable=import-outside-toplevel
-        except ImportError:
-            import chunking  # pylint: disable=import-outside-toplevel
+        if __package__:
+            try:
+                chunking = import_module(".chunking", package=__package__)
+            except ImportError:
+                chunking = import_module("chunking")
+        else:
+            chunking = import_module("chunking")
 
         # Run the synchronous chunking.main in a threadpool
         try:

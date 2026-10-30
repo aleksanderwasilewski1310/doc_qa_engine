@@ -52,7 +52,7 @@ def _embed_single_text_titan(text: str, client, model_id: str) -> list[float]:
 
 
 def _embed_cohere_multilingual(
-    texts: list[str], client, model_id: str
+        texts: list[str], client, model_id: str
 ) -> list[list[float]]:
     """Cohere v3 supports batching multiple texts natively in a single API call."""
     payload = {"texts": texts, "input_type": "search_document", "truncate": "END"}
@@ -69,7 +69,7 @@ def _embed_cohere_multilingual(
 
 
 def embed_texts(
-    texts: list[str], model_id: str | None = None
+        texts: list[str], model_id: str | None = None
 ) -> list[list[float]]:
     """Return embeddings for the provided list of texts using AWS Bedrock.
 

@@ -23,7 +23,7 @@ def build_bedrock_llm():
 
 
 def _format_retrieval_results(
-    rows: list[tuple[Any, Any, Any, Any]],
+        rows: list[tuple[Any, Any, Any, Any]],
 ) -> dict[str, Any]:
     """Build sorted context, source, and chunk results from database rows."""
     chunks = []
