@@ -31,6 +31,7 @@ jobs:
           output: /tmp/results.sarif
           format: sarif
           gh-code-scanning-compat: true
+          extra_args: "--py-version 3.13"
 
       - name: Assign unique SARIF categories
         run: |
