@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to enable CloudTrail using an existing S3 bucket for account 990944979960 in eu-central-1.
+
+Parameters:
+  TrailName:
+    Type: String
+    Description: The name of the CloudTrail trail.
+  ExistingBucketName:
+    Type: String
+    Description: The name of your existing S3 bucket for storing logs.
+  TargetRegion:
+    Type: String
+    Description: The target AWS region.
+  AccountID:
+    Type: String
+    Description: Your 12-digit AWS Account ID.
+
+Resources:
+  # 1. S3 Bucket Policy allowing CloudTrail to write logs to your existing bucket
+  CloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ExistingBucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !Sub 'arn:aws:s3:::${ExistingBucketName}'
+            Condition:
+              StringEquals:
+                'aws:SourceArn': !Sub 'arn:aws:cloudtrail:${TargetRegion}:${AccountID}:trail/${TrailName}'
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::${ExistingBucketName}/AWSLogs/${AccountID}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceArn': !Sub 'arn:aws:cloudtrail:${TargetRegion}:${AccountID}:trail/${TrailName}'
+                's3:x-amz-acl': bucket-owner-full-control
+
+  # 2. CloudTrail Trail Resource pointing to your existing bucket
+  AccountTrail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn:
+      - CloudTrailBucketPolicy
+    Properties:
+      TrailName: !Ref TrailName
+      S3BucketName: !Ref ExistingBucketName
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+
+Outputs:
+  CloudTrailName:
+    Description: The name of the created CloudTrail trail.
+    Value: !Ref AccountTrail
+  S3BucketName:
+    Description: The existing S3 bucket storing the CloudTrail logs.
+    Value: !Ref ExistingBucketName
