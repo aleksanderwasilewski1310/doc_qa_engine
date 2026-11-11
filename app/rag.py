@@ -1,7 +1,7 @@
 """pgvector retrieval and context-grounded answer generation."""
 
 import os
-from typing import Any
+from typing import Any, Dict, List, Tuple
 
 import boto3
 from fastapi import HTTPException
@@ -23,8 +23,8 @@ def build_bedrock_llm():
 
 
 def _format_retrieval_results(
-        rows: list[tuple[Any, Any, Any, Any]],
-) -> dict[str, Any]:
+    rows: List[Tuple[Any, Any, Any, Any]],
+) -> Dict[str, Any]:
     """Build sorted context, source, and chunk results from database rows."""
     chunks = []
     for chunk_id, document_name, chunk_text, similarity in rows:
@@ -55,7 +55,7 @@ def _format_retrieval_results(
     return {"context": "\n\n".join(context_parts), "sources": sources, "chunks": chunks}
 
 
-def retrieve_relevant_chunks(question: str, top_k: int = 5) -> dict[str, Any]:
+def retrieve_relevant_chunks(question: str, top_k: int = 5) -> Dict[str, Any]:
     """Query pgvector for the most similar chunks and return them as retrieval candidates."""
     query_vector = embed_texts([question])[0]
     embedding_literal = (
@@ -102,7 +102,7 @@ def _is_missing_answer(answer_text: str) -> bool:
     )
 
 
-def answer_question(question: str, top_k: int = 5) -> dict[str, Any]:
+def answer_question(question: str, top_k: int = 5) -> Dict[str, Any]:
     """Ground an answer using all retrieved pgvector chunks as context, ordered by similarity."""
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question must not be empty.")

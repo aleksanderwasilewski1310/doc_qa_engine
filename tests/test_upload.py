@@ -17,11 +17,9 @@ class TestUploadEndpoint(unittest.TestCase):
         """Store the PDF in S3 and invoke the chunking pipeline."""
         upload = UploadFile(filename="sample.pdf", file=BytesIO(b"pdf contents"))
 
-        with (
-            patch.object(api.S3_CLIENT, "put_object") as put_object,
-            patch.object(api, "chunk_main") as chunk_main,
-        ):
-            result = asyncio.run(api.upload_and_chunk(upload, 10.0))
+        with patch.object(api.S3_CLIENT, "put_object") as put_object:
+            with patch.object(api, "chunk_main") as chunk_main:
+                result = asyncio.run(api.upload_and_chunk(upload, 10.0))
 
         put_object.assert_called_once_with(
             Bucket="enterprise-document-storage-prod-eu-central-1",

@@ -8,7 +8,7 @@ character text splitter.
 import logging
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -27,7 +27,7 @@ except ImportError as err:
         LOGGER.error("Error importing insert_chunks: %s", fallback_error)
 
         # Fallback dummy function if db_client is not present during standalone execution/testing
-        def insert_chunks(_records: list[dict[str, Any]]) -> None:
+        def insert_chunks(_records: List[Dict[str, Any]]) -> None:
             """Allow chunking to run when database support is unavailable."""
             return
 
@@ -137,7 +137,7 @@ def chunk_pdf(
     return chunked_documents
 
 
-def _attach_embeddings(records: list[dict[str, Any]]) -> None:
+def _attach_embeddings(records: List[Dict[str, Any]]) -> None:
     """Attach vectors when embedding support is available; log and continue on failure."""
     if embed_texts is None or not records:
         return
