@@ -1,0 +1,5 @@
+[MAIN]
+py-version=3.13
+
+[MESSAGES CONTROL]
+disable=django-not-configured

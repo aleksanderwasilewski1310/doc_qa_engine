@@ -1,3 +1,5 @@
+"""Download TrOCR model assets and package them for SageMaker deployment."""
+
 import os
 import tarfile
 
@@ -20,7 +22,7 @@ snapshot_download(
 os.makedirs(CODE_DIR, exist_ok=True)
 
 # 3. Write the dedicated inference script inference.py
-inference_code = """import io
+INFERENCE_CODE = """import io
 import torch
 from PIL import Image
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
@@ -56,7 +58,7 @@ def transform_fn(model_dict, input_data, content_type, accept_header):
 """
 
 with open(os.path.join(CODE_DIR, "inference.py"), "w", encoding="utf-8") as f:
-    f.write(inference_code)
+    f.write(INFERENCE_CODE)
 
 print("Created code/inference.py")
 

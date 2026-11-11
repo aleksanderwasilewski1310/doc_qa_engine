@@ -1,13 +1,14 @@
+"""Evaluate RAG answers with Ragas metrics."""
+
 from __future__ import annotations
 
 from typing import Any
+from ragas import evaluate
+from ragas.metrics import answer_relevancy, context_precision, faithfulness
 
 
 def _load_ragas():
     try:
-        from ragas import evaluate
-        from ragas.metrics import answer_relevancy, context_precision, faithfulness
-
         return evaluate, answer_relevancy, context_precision, faithfulness
     except ModuleNotFoundError as exc:
         raise RuntimeError(
@@ -15,6 +16,18 @@ def _load_ragas():
             "Reinstall dependencies after aligning langchain-community with ragas, e.g.: "
             "pip install -U 'langchain-community>=0.4.2' 'ragas>=0.2.15'"
         ) from exc
+
+
+def _normalize_scores(result: Any) -> dict[str, float]:
+    """Convert Ragas evaluation output into a flat mapping of metric scores."""
+    scores = {}
+    for name, value in result.items():
+        if isinstance(value, dict):
+            for metric_name, metric_value in value.items():
+                scores[metric_name] = float(metric_value)
+        else:
+            scores[name] = float(value)
+    return scores
 
 
 def evaluate_rag(
@@ -49,15 +62,7 @@ def evaluate_rag(
     ]
 
     result = evaluate(data, metrics=metrics)
-    scores = {}
-    for name, value in result.items():
-        if isinstance(value, dict):
-            for metric_name, metric_value in value.items():
-                scores[metric_name] = float(metric_value)
-        else:
-            scores[name] = float(value)
-
     return {
         "status": "ok",
-        "scores": scores,
+        "scores": _normalize_scores(result),
     }

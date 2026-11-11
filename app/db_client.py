@@ -1,3 +1,5 @@
+"""Database connection and document-chunk persistence helpers."""
+
 import os
 from datetime import UTC, datetime
 
@@ -5,6 +7,7 @@ import psycopg
 
 
 def _get_db_config():
+    """Build PostgreSQL connection settings from environment variables."""
     return {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", "5433")),
@@ -15,6 +18,7 @@ def _get_db_config():
 
 
 def get_connection():
+    """Open and return a PostgreSQL connection using the configured settings."""
     cfg = _get_db_config()
     return psycopg.connect(**cfg)
 
@@ -26,9 +30,17 @@ def insert_chunk(
     timestamp: datetime | None = None,
     embedding: list[float] | None = None,
 ) -> int:
-    """Insert a single chunk into the `doc_chunks` table.
+    """Insert one document chunk into the ``doc_chunks`` table.
 
-    Returns the inserted row id.
+    Args:
+        document_name: Name of the source document.
+        chunk_text: Text content of the chunk.
+        distance: Optional retrieval distance associated with the chunk.
+        timestamp: Optional timestamp to store; defaults to the current UTC time.
+        embedding: Optional vector embedding to store alongside the chunk.
+
+    Returns:
+        The ID of the inserted row.
     """
     ts = timestamp if timestamp is not None else datetime.now(UTC)
     conn = get_connection()
@@ -38,12 +50,14 @@ def insert_chunk(
                 # Convert embedding list to Postgres vector literal string and cast to vector
                 emb_str = "[" + ",".join(str(float(x)) for x in embedding) + "]"
                 cur.execute(
-                    "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance, embedding) VALUES (%s, %s, %s, %s, %s::vector) RETURNING id",
+                    "INSERT INTO doc_chunks (document_name, timestamp, chunk_text," \
+                    " distance, embedding) VALUES (%s, %s, %s, %s, %s::vector) RETURNING id",
                     (document_name, ts, chunk_text, distance, emb_str),
                 )
             else:
                 cur.execute(
-                    "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance) VALUES (%s, %s, %s, %s) RETURNING id",
+                    "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance) " \
+                    "VALUES (%s, %s, %s, %s) RETURNING id",
                     (document_name, ts, chunk_text, distance),
                 )
             inserted = cur.fetchone()[0]
@@ -54,11 +68,13 @@ def insert_chunk(
 
 
 def insert_chunks(chunks: list[dict]) -> None:
-    """Insert multiple chunks. Each chunk is a dict with keys:
-    - document_name (str)
-    - chunk_text (str)
-    - distance (optional float)
-    - timestamp (optional datetime)
+    """Insert multiple chunks into the ``doc_chunks`` table.
+
+    Each chunk dictionary must contain ``document_name`` and ``chunk_text``.
+    It may also contain ``distance``, ``timestamp``, and ``embedding``.
+
+    Args:
+        chunks: Chunk records to insert. An empty list is ignored.
     """
     if not chunks:
         return
@@ -72,7 +88,8 @@ def insert_chunks(chunks: list[dict]) -> None:
                 if embedding is not None:
                     emb_str = "[" + ",".join(str(float(x)) for x in embedding) + "]"
                     cur.execute(
-                        "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance, embedding) VALUES (%s,%s,%s,%s,%s::vector)",
+                        "INSERT INTO doc_chunks (document_name, timestamp, chunk_text," \
+                        " distance, embedding) VALUES (%s,%s,%s,%s,%s::vector)",
                         (
                             c["document_name"],
                             ts,
@@ -83,7 +100,8 @@ def insert_chunks(chunks: list[dict]) -> None:
                     )
                 else:
                     cur.execute(
-                        "INSERT INTO doc_chunks (document_name, timestamp, chunk_text, distance) VALUES (%s,%s,%s,%s)",
+                        "INSERT INTO doc_chunks (document_name, timestamp, chunk_text," \
+                        " distance) VALUES (%s,%s,%s,%s)",
                         (c["document_name"], ts, c["chunk_text"], c.get("distance")),
                     )
         conn.commit()
